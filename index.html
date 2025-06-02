@@ -2,25 +2,38 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Smart Switch Control</title>
+  <title>Yarsa_Workshop - Smart Switch Control</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
       margin: 0;
       padding: 20px;
+      background-image: url('yarsalogo.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      backdrop-filter: brightness(0.9);
       display: flex;
       flex-direction: column;
       align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #fff;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.6);
+      margin-bottom: 10px;
     }
 
     h2 {
+      color: #fff;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
       margin-top: 0;
-      color: #333;
+      margin-bottom: 20px;
     }
 
     .section {
-      background: #fff;
+      background: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       width: 100%;
@@ -85,10 +98,6 @@
       margin: 0 4px;
     }
 
-    .day-checkboxes input {
-      margin-top: 4px;
-    }
-
     .radio-group {
       display: flex;
       justify-content: space-around;
@@ -101,10 +110,6 @@
       font-size: 14px;
     }
 
-    .radio-group input {
-      margin-right: 4px;
-    }
-
     #status {
       margin-top: 8px;
       font-size: 14px;
@@ -114,191 +119,122 @@
   </style>
 </head>
 <body>
+  <h1>Yarsa_Workshop</h1>
   <h2>Smart Switch Control</h2>
 
-  <!-- SECTION 1: Device Input & Immediate ON/OFF -->
+  <!-- Device Input & ON/OFF -->
   <div class="section">
     <h3>Device & Immediate Power</h3>
     <label for="device">Device Topic:</label>
     <input type="text" id="device" placeholder="e.g. messi" />
-
     <button id="onBtn" disabled>Turn ON</button>
     <button id="offBtn" disabled>Turn OFF</button>
-
     <div id="status"></div>
   </div>
 
-  <!-- SECTION 2: Timer Configuration -->
+  <!-- Timer Control -->
   <div class="section">
     <h3>Configure Timer</h3>
-
     <label for="timerTime">Select Time:</label>
     <input type="time" id="timerTime" />
-
     <label>Select Days of Week:</label>
     <div class="day-checkboxes">
-      <label>
-        S<input type="checkbox" id="day0" />
-      </label>
-      <label>
-        M<input type="checkbox" id="day1" />
-      </label>
-      <label>
-        T<input type="checkbox" id="day2" />
-      </label>
-      <label>
-        W<input type="checkbox" id="day3" />
-      </label>
-      <label>
-        T<input type="checkbox" id="day4" />
-      </label>
-      <label>
-        F<input type="checkbox" id="day5" />
-      </label>
-      <label>
-        S<input type="checkbox" id="day6" />
-      </label>
+      <label>S<input type="checkbox" id="day0" /></label>
+      <label>M<input type="checkbox" id="day1" /></label>
+      <label>T<input type="checkbox" id="day2" /></label>
+      <label>W<input type="checkbox" id="day3" /></label>
+      <label>T<input type="checkbox" id="day4" /></label>
+      <label>F<input type="checkbox" id="day5" /></label>
+      <label>S<input type="checkbox" id="day6" /></label>
     </div>
-
     <label>Action:</label>
     <div class="radio-group">
       <label><input type="radio" name="action" value="on" checked />Turn ON</label>
       <label><input type="radio" name="action" value="off" />Turn OFF</label>
     </div>
-
     <button id="setTimerBtn" disabled>Set Timer</button>
   </div>
 
-  <!-- Include MQTT over WebSockets -->
+  <!-- MQTT Logic -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
-    // 1. Connect to EMQX public broker via WebSocket
     const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-
-    // 2. Grab references to DOM elements
     const statusDiv = document.getElementById('status');
     const deviceInput = document.getElementById('device');
     const onBtn = document.getElementById('onBtn');
     const offBtn = document.getElementById('offBtn');
     const setTimerBtn = document.getElementById('setTimerBtn');
     const timerTimeInput = document.getElementById('timerTime');
-    const dayCheckboxes = [
-      document.getElementById('day0'),
-      document.getElementById('day1'),
-      document.getElementById('day2'),
-      document.getElementById('day3'),
-      document.getElementById('day4'),
-      document.getElementById('day5'),
-      document.getElementById('day6'),
-    ];
+    const dayCheckboxes = Array.from({ length: 7 }, (_, i) => document.getElementById(`day${i}`));
 
-    // 3. MQTT Event Handlers
     client.on('connect', () => {
       statusDiv.textContent = 'Connected to MQTT broker';
       statusDiv.style.color = 'green';
-      // Enable buttons once connected
       onBtn.disabled = false;
       offBtn.disabled = false;
       setTimerBtn.disabled = false;
     });
 
-    client.on('error', (err) => {
+    client.on('error', err => {
       statusDiv.textContent = 'Error: ' + err.message;
       statusDiv.style.color = 'red';
     });
 
-    // 4. Immediate ON/OFF Button Logic
     onBtn.addEventListener('click', () => {
       const device = deviceInput.value.trim();
-      if (!device) {
-        statusDiv.textContent = 'Please enter a device topic';
-        statusDiv.style.color = 'red';
-        return;
-      }
+      if (!device) return showError('Please enter a device topic');
       const topic = `cmnd/${device}/Power`;
-      client.publish(topic, 'ON', {}, (err) => {
-        if (err) {
-          statusDiv.textContent = `Failed to send ON: ${err.message}`;
-          statusDiv.style.color = 'red';
-        } else {
-          statusDiv.textContent = `Sent ON to ${topic}`;
-          statusDiv.style.color = 'green';
-        }
-      });
+      client.publish(topic, 'ON', {}, handleResult('ON', topic));
     });
 
     offBtn.addEventListener('click', () => {
       const device = deviceInput.value.trim();
-      if (!device) {
-        statusDiv.textContent = 'Please enter a device topic';
-        statusDiv.style.color = 'red';
-        return;
-      }
+      if (!device) return showError('Please enter a device topic');
       const topic = `cmnd/${device}/Power`;
-      client.publish(topic, 'OFF', {}, (err) => {
-        if (err) {
-          statusDiv.textContent = `Failed to send OFF: ${err.message}`;
-          statusDiv.style.color = 'red';
-        } else {
-          statusDiv.textContent = `Sent OFF to ${topic}`;
-          statusDiv.style.color = 'green';
-        }
-      });
+      client.publish(topic, 'OFF', {}, handleResult('OFF', topic));
     });
 
-    // 5. Timer Button Logic
     setTimerBtn.addEventListener('click', () => {
       const device = deviceInput.value.trim();
-      if (!device) {
-        statusDiv.textContent = 'Please enter a device topic';
-        statusDiv.style.color = 'red';
-        return;
-      }
+      if (!device) return showError('Please enter a device topic');
+      const timeValue = timerTimeInput.value;
+      if (!timeValue) return showError('Please pick a time');
 
-      // 5.1 Read selected time
-      const timeValue = timerTimeInput.value; // "HH:MM"
-      if (!timeValue) {
-        statusDiv.textContent = 'Please pick a time';
-        statusDiv.style.color = 'red';
-        return;
-      }
+      let daysString = dayCheckboxes.map(cb => cb.checked ? '1' : '0').join('');
+      if (daysString === '0000000') daysString = '1111111';
 
-      // 5.2 Build the Days string ("1111111" by default if none selected)
-      let daysString = '';
-      for (let i = 0; i < 7; i++) {
-        daysString += (dayCheckboxes[i].checked ? '1' : '0');
-      }
-      if (daysString === '0000000') {
-        daysString = '1111111';
-      }
-
-      // 5.3 Read the action (ON or OFF)
       const actionValue = document.querySelector('input[name="action"]:checked').value;
-      const actionInt = actionValue === 'on' ? 1 : 0;
-
-      // 5.4 Build the JSON payload exactly for Tasmota Timer1
       const payload = {
         Enable: 1,
-        Mode: 0,               // time-based
-        Time: timeValue,       // e.g. "12:57"
-        Window: 0,             // no ± offset
-        Days: daysString,      // e.g. "0111110"
-        Repeat: 0,             // single-action (not repeated beyond Days)
-        Output: 1,             // POWER1
-        Action: actionInt      // 1=ON, 0=OFF
+        Mode: 0,
+        Time: timeValue,
+        Window: 0,
+        Days: daysString,
+        Repeat: 0,
+        Output: 1,
+        Action: actionValue === 'on' ? 1 : 0
       };
 
       const topic = `cmnd/${device}/Timer1`;
-      client.publish(topic, JSON.stringify(payload), {}, (err) => {
+      client.publish(topic, JSON.stringify(payload), {}, handleResult(`Timer set to ${actionValue.toUpperCase()} at ${timeValue}`, topic));
+    });
+
+    function handleResult(message, topic) {
+      return err => {
         if (err) {
-          statusDiv.textContent = `Failed to set timer: ${err.message}`;
+          statusDiv.textContent = `Error: ${err.message}`;
           statusDiv.style.color = 'red';
         } else {
-          statusDiv.textContent = `Timer set for ${timeValue} on days ${daysString} to ${actionValue.toUpperCase()}`;
+          statusDiv.textContent = `✅ ${message} → ${topic}`;
           statusDiv.style.color = 'green';
         }
-      });
-    });
+      };
+    }
+
+    function showError(msg) {
+      statusDiv.textContent = msg;
+      statusDiv.style.color = 'red';
+    }
   </script>
 </body>
 </html>
