@@ -1,39 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Yarsa_Workshop - Smart Switch Control</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Yarsa_Workshop</title>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-image: url('yarsalogo.png');
+      background-image: url('yarsalogo.png'); /* Make sure this image is in the same folder */
       background-size: cover;
-      background-repeat: no-repeat;
       background-position: center;
+      background-repeat: no-repeat;
       color: white;
       text-align: center;
-      padding: 20px;
+      padding-top: 80px;
+      backdrop-filter: brightness(0.5);
     }
-    .container {
-      background: rgba(0, 0, 0, 0.6);
-      padding: 20px;
-      border-radius: 12px;
-      display: inline-block;
-      margin-top: 40px;
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 40px;
     }
-    input, select, button {
-      margin: 5px;
+
+    input, button, select {
       padding: 10px;
-      border-radius: 8px;
+      margin: 10px;
       border: none;
-      font-size: 14px;
+      border-radius: 5px;
+      font-size: 1em;
     }
+
     button {
+      background-color: #007BFF;
+      color: white;
       cursor: pointer;
     }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
     #status {
-      margin-top: 10px;
+      margin-top: 20px;
       font-weight: bold;
     }
   </style>
@@ -41,40 +50,23 @@
 <body>
   <h1>Yarsa_Workshop</h1>
 
-  <div class="container">
-    <h2>Smart LED Control</h2>
+  <input id="device" placeholder="Enter Tasmota device topic (e.g., messi)" />
 
-    <input id="device" placeholder="Enter device topic (e.g., messi)">
-    <br>
+  <div>
+    <button onclick="sendCommand('ON')">Turn ON</button>
+    <button onclick="sendCommand('OFF')">Turn OFF</button>
+  </div>
 
-    <button onclick="sendPowerCommand('ON')">Turn ON</button>
-    <button onclick="sendPowerCommand('OFF')">Turn OFF</button>
-    
-    <h3>Set Timer</h3>
-    <input id="timeInput" type="time">
+  <div>
+    <input id="timerTime" type="time" />
     <select id="action">
       <option value="1">Turn ON</option>
       <option value="0">Turn OFF</option>
     </select>
-    <label>Repeat:</label>
-    <select id="repeat">
-      <option value="0">No</option>
-      <option value="1">Yes</option>
-    </select>
-    <br>
-    <label>Days (check to enable):</label><br>
-    <label><input type="checkbox" class="day" value="1" checked>Sun</label>
-    <label><input type="checkbox" class="day" value="1" checked>Mon</label>
-    <label><input type="checkbox" class="day" value="1" checked>Tue</label>
-    <label><input type="checkbox" class="day" value="1" checked>Wed</label>
-    <label><input type="checkbox" class="day" value="1" checked>Thu</label>
-    <label><input type="checkbox" class="day" value="1" checked>Fri</label>
-    <label><input type="checkbox" class="day" value="1" checked>Sat</label>
-    <br><br>
     <button onclick="setTimer()">Set Timer</button>
-
-    <div id="status">Connecting...</div>
   </div>
+
+  <div id="status">Connecting to MQTT...</div>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
@@ -86,69 +78,56 @@
       statusDiv.style.color = 'lightgreen';
     });
 
-    client.on('error', err => {
-      statusDiv.textContent = `❌ Error: ${err.message}`;
+    client.on('error', (err) => {
+      statusDiv.textContent = `❌ MQTT Error: ${err.message}`;
       statusDiv.style.color = 'red';
     });
 
-    function sendPowerCommand(command) {
+    function sendCommand(cmd) {
       const device = document.getElementById('device').value.trim();
       if (!device) {
-        statusDiv.textContent = 'Please enter a device topic';
-        statusDiv.style.color = 'yellow';
+        statusDiv.textContent = '⚠️ Please enter a device topic.';
+        statusDiv.style.color = 'orange';
         return;
       }
+
       const topic = `cmnd/${device}/Power`;
-      client.publish(topic, command, {}, err => {
-        if (err) {
-          statusDiv.textContent = `Failed to send command: ${err.message}`;
-          statusDiv.style.color = 'red';
-        } else {
-          statusDiv.textContent = `Sent ${command} to ${topic}`;
-          statusDiv.style.color = 'lightgreen';
-        }
+      client.publish(topic, cmd, {}, (err) => {
+        statusDiv.textContent = err
+          ? `❌ Error: ${err.message}`
+          : `✅ Sent "${cmd}" to ${topic}`;
+        statusDiv.style.color = err ? 'red' : 'lightgreen';
       });
     }
 
     function setTimer() {
       const device = document.getElementById('device').value.trim();
-      const time = document.getElementById('timeInput').value;
+      const time = document.getElementById('timerTime').value;
       const action = parseInt(document.getElementById('action').value);
-      const repeat = parseInt(document.getElementById('repeat').value);
 
       if (!device || !time) {
-        statusDiv.textContent = 'Please fill all fields';
+        statusDiv.textContent = '⚠️ Enter device topic and select time.';
         statusDiv.style.color = 'orange';
         return;
       }
 
-      const dayChecks = document.querySelectorAll('.day');
-      let daysString = '';
-      dayChecks.forEach(box => {
-        daysString += box.checked ? '1' : '0';
-      });
-
+      const topic = `cmnd/${device}/Timer1`;
       const payload = {
         "Enable": 1,
         "Mode": 0,
         "Time": time,
         "Window": 0,
-        "Days": daysString,
-        "Repeat": repeat,
+        "Days": "1111111",
+        "Repeat": 0,
         "Output": 1,
         "Action": action
       };
 
-      const topic = `cmnd/${device}/Timer1`;
-
-      client.publish(topic, JSON.stringify(payload), {}, err => {
-        if (err) {
-          statusDiv.textContent = `Failed to set timer: ${err.message}`;
-          statusDiv.style.color = 'red';
-        } else {
-          statusDiv.textContent = `Timer set for ${time} (${action === 1 ? 'ON' : 'OFF'})`;
-          statusDiv.style.color = 'lightgreen';
-        }
+      client.publish(topic, JSON.stringify(payload), {}, (err) => {
+        statusDiv.textContent = err
+          ? `❌ Failed to set timer: ${err.message}`
+          : `✅ Timer set to ${time} with action ${action === 1 ? 'ON' : 'OFF'}`;
+        statusDiv.style.color = err ? 'red' : 'lightgreen';
       });
     }
   </script>
