@@ -8,24 +8,34 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-image: url('yarsalogo.png'); /* Make sure this image is in the same folder */
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
+      background-color: #121212;
       color: white;
       text-align: center;
       padding-top: 80px;
-      backdrop-filter: brightness(0.5);
+      position: relative;
     }
 
     h1 {
       font-size: 2.5em;
-      margin-bottom: 40px;
+      margin-bottom: 20px;
+      z-index: 1;
+      position: relative;
+    }
+
+    .logo-bg {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0.1;
+      width: 300px;
+      height: auto;
+      z-index: 0;
     }
 
     input, button, select {
       padding: 10px;
-      margin: 10px;
+      margin: 8px;
       border: none;
       border-radius: 5px;
       font-size: 1em;
@@ -45,24 +55,52 @@
       margin-top: 20px;
       font-weight: bold;
     }
+
+    .timer-section {
+      margin-top: 30px;
+    }
+
+    .days-container {
+      margin-top: 10px;
+    }
+
+    .day {
+      margin: 0 5px;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Background Logo -->
+  <img src="yarsalogo.png" alt="Yarsa Logo" class="logo-bg" />
+
   <h1>Yarsa_Workshop</h1>
 
-  <input id="device" placeholder="Enter Tasmota device topic (e.g., messi)" />
+  <input id="device" placeholder="Enter Tasmota topic (e.g. messi)" />
 
   <div>
     <button onclick="sendCommand('ON')">Turn ON</button>
     <button onclick="sendCommand('OFF')">Turn OFF</button>
   </div>
 
-  <div>
+  <div class="timer-section">
+    <h3>Set Timer</h3>
     <input id="timerTime" type="time" />
     <select id="action">
       <option value="1">Turn ON</option>
       <option value="0">Turn OFF</option>
     </select>
+
+    <div class="days-container">
+      <label class="day"><input type="checkbox" value="1" /> Sun</label>
+      <label class="day"><input type="checkbox" value="2" /> Mon</label>
+      <label class="day"><input type="checkbox" value="3" /> Tue</label>
+      <label class="day"><input type="checkbox" value="4" /> Wed</label>
+      <label class="day"><input type="checkbox" value="5" /> Thu</label>
+      <label class="day"><input type="checkbox" value="6" /> Fri</label>
+      <label class="day"><input type="checkbox" value="7" /> Sat</label>
+    </div>
+
     <button onclick="setTimer()">Set Timer</button>
   </div>
 
@@ -111,13 +149,24 @@
         return;
       }
 
+      const daysCheckboxes = document.querySelectorAll('.days-container input[type="checkbox"]');
+      let daysBinary = Array(7).fill('0');
+
+      daysCheckboxes.forEach((checkbox, idx) => {
+        if (checkbox.checked) {
+          daysBinary[(checkbox.value - 1)] = '1';
+        }
+      });
+
+      const daysString = daysBinary.join('');
+
       const topic = `cmnd/${device}/Timer1`;
       const payload = {
         "Enable": 1,
         "Mode": 0,
         "Time": time,
         "Window": 0,
-        "Days": "1111111",
+        "Days": daysString,
         "Repeat": 0,
         "Output": 1,
         "Action": action
@@ -126,7 +175,7 @@
       client.publish(topic, JSON.stringify(payload), {}, (err) => {
         statusDiv.textContent = err
           ? `❌ Failed to set timer: ${err.message}`
-          : `✅ Timer set to ${time} with action ${action === 1 ? 'ON' : 'OFF'}`;
+          : `✅ Timer set for ${time} on [${daysString}] to ${action === 1 ? 'ON' : 'OFF'}`;
         statusDiv.style.color = err ? 'red' : 'lightgreen';
       });
     }
